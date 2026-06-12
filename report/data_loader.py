@@ -30,6 +30,12 @@ def load_data() -> pd.DataFrame:
             FROM {DB_TABLE_NAME}
             WHERE response_status_code != 0 AND "DataSetType" = 'Malicious'
             GROUP BY "WAF_Name"
+                ),
+                LATENCY AS (
+                    SELECT "WAF_Name", ROUND(AVG(response_time_ms), 1) AS avg_latency_ms
+                    FROM {DB_TABLE_NAME}
+                    WHERE response_status_code != 0
+                    GROUP BY "WAF_Name"
                 )
             SELECT TPR."WAF_Name",
                    1337 AS reference_id,
@@ -37,9 +43,11 @@ def load_data() -> pd.DataFrame:
                    ROUND(100 - TPR.true_positive_rate, 1)                          AS false_negative_rate,
                    ROUND(TPR.true_positive_rate, 1)                                AS true_positive_rate,
                    ROUND(TNR.true_negative_rate, 1)                                AS true_negative_rate,
-                   ROUND((TPR.true_positive_rate + TNR.true_negative_rate) / 2, 1) AS balanced_accuracy
+                   ROUND((TPR.true_positive_rate + TNR.true_negative_rate) / 2, 1) AS balanced_accuracy,
+                   LATENCY.avg_latency_ms                                          AS avg_latency_ms
             FROM TPR
             JOIN TNR ON TPR."WAF_Name" = TNR."WAF_Name"
+            JOIN LATENCY ON TPR."WAF_Name" = LATENCY."WAF_Name"
             ORDER BY balanced_accuracy DESC;
         """)
     df = pd.read_sql_query(query, conn)
@@ -51,6 +59,7 @@ def load_data() -> pd.DataFrame:
         "true_positive_rate": "True Positive Rate",
         "true_negative_rate": "True Negative Rate",
         "balanced_accuracy": "Balanced Accuracy",
+        "avg_latency_ms": "Avg Latency ms",
     }, axis=1).copy()
 
 

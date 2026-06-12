@@ -112,6 +112,23 @@
               >
             </div>
           </div>
+          <div class="info-item">
+            <span class="info-card-label">Average Latency</span>
+            <div class="info-card-value">
+              <svg
+                class="info-card-icon time-circle"
+                fill="none"
+                stroke="#6b7280"
+                viewBox="0 0 24 24"
+              >
+                <circle cx="12" cy="12" r="10" stroke-width="2" />
+                <polyline points="12 6 12 12 16 14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span class="value-text"
+                >{% if waf.first_page.avg_latency_ms != "N/A" %}{{ waf.first_page.avg_latency_ms }} ms{% else %}N/A{% endif %}</span
+              >
+            </div>
+          </div>
         </div>
         <div class="card score-card">
           <div

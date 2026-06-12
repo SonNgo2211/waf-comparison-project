@@ -193,7 +193,7 @@ class Wafs:
         dff['TestName'] = _test_name.stem
         dff['DataSetType'] = _test_name.parent.stem
         dff['headers'] = dff['headers'].apply(json.dumps)
-        dff[['response_status_code', 'isBlocked']] = res
+        dff[['response_status_code', 'isBlocked', 'response_time_ms']] = res
         # Replacing null bytes with Unicode replacement character in order to save letter in the database
         dff['url'] = dff['url'].str.replace("\x00", "\uFFFD")
         dff['data'] = dff['data'].str.replace("\x00", "\uFFFD")

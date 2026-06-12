@@ -107,6 +107,7 @@ def _get_first_page_data(waf_name: str, waf_data: Any, data_df: pd.DataFrame, le
                            right_percentage=waf_data["True Negative Rate"]),
         "bar_chart": get_bar_chart(data_df, waf_name),
         "score_card": get_score_card_data(waf_data),
+        "avg_latency_ms": waf_data.get("Avg Latency ms", "N/A"),
     }
 
 

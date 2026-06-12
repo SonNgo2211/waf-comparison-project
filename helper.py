@@ -140,12 +140,13 @@ def send_request(_method: str, _url: str, _headers: Optional[Dict[str, str]] = N
             return [
                 res.status_code,
                 "The requested URL was rejected. Please consult with your administrator." in res.text
-                or res.status_code == 403
+                or res.status_code == 403,
+                round(res.elapsed.total_seconds() * 1000.0, 2)
             ]
         except Exception:
             attempts += 1
             time.sleep(0.1 * attempts)
-    return [0, False]
+    return [0, False, 0.0]
 
 
 def is_table_exists(_table_name: str) -> bool:
