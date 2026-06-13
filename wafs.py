@@ -51,7 +51,7 @@ class Wafs:
             url = self._get_url_by_waf_name(_waf)
 
             # Health check: send a test GET request and log if it was successful or not.
-            res_status_code, _ = send_request(
+            res_status_code, _, _ = send_request(
                 'GET',
                 url,
                 {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:105.0) Gecko/20100101 Firefox/105.0"}
@@ -66,7 +66,7 @@ class Wafs:
 
             # Functional check: send a potentially harmful GET request and check if it gets blocked.
             malicious_payload = url + "/?a=<script>alert(1)</script>"
-            res_status_code, is_blocked = send_request('GET', malicious_payload)
+            res_status_code, is_blocked, _ = send_request('GET', malicious_payload)
             functional_ok = is_blocked
             if functional_ok:
                 log.info(f"WAF functionality check passed - WAF: {_waf}")
