@@ -9,5 +9,6 @@
 !logger.py
 !requirements.txt
 !entrypoint.py
+!benchmark_publisher.py
 __pycache__/
 *.pyc

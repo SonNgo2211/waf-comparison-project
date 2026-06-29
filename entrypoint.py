@@ -1,5 +1,6 @@
 import shutil
 import argparse
+import os
 from pathlib import Path
 import sys
 
@@ -8,6 +9,7 @@ from config import RESULTS_PATH, DB_PATH, DB_FILE_NAME, DATA_SETS_PATH, \
 from logger import log, init_file_logging
 from runner import runner
 from analyzer import analyzer
+from benchmark_publisher import capture_runtime_identity, publish_benchmark
 
 db_file = DB_PATH / DB_FILE_NAME
 wafs_config_file = DB_PATH / WAFS_CONFIG_FILE_NAME
@@ -208,7 +210,21 @@ def main() -> None:
     _validate_directories()
     args = _parse_arguments()
     _init_logging(args.fresh_run)
+    publish_enabled = os.getenv("WCP_PUBLISH_BENCHMARK", "false").lower() in {"1", "true", "yes", "on"}
+    runtime_identity = None
+    if publish_enabled:
+        try:
+            runtime_identity = capture_runtime_identity()
+            log.info(
+                "Captured benchmark runtime identity: model=%s bundle=%s",
+                runtime_identity.get("model_version"),
+                runtime_identity.get("active_bundle_id"),
+            )
+        except Exception:
+            log.exception("Cannot capture runtime identity; benchmark will run without publishing evidence")
     _execute_workflow(args)
+    if runtime_identity:
+        publish_benchmark(runtime_identity)
 
 
 if __name__ == "__main__":
