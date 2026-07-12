@@ -116,7 +116,7 @@ def prepare_data() -> None:
 
 
 def send_request(_method: str, _url: str, _headers: Optional[Dict[str, str]] = None, _data: Any = None,
-                 _timeout: float = 0.5) -> List[Any]:
+                 _timeout: float = 2.0) -> List[Any]:
     """
     Send an individual HTTP request and return the status code and whether the request was blocked.
 
