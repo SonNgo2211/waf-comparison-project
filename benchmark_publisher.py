@@ -49,26 +49,59 @@ def _json_get(url: str, timeout: float = 10.0, max_retries: int = 5) -> dict[str
     return {}
 
 
+def prepare_benchmark_session() -> dict[str, Any]:
+    """Ask the training server to authorize and prepare one benchmark run."""
+    training_url = os.getenv("TRAINING_SERVER_URL", "http://waf-training:8081").rstrip("/")
+    headers = {"Content-Type": "application/json"}
+    token = os.getenv("TRAINING_API_TOKEN", "")
+    if token:
+        headers["X-WAF-Token"] = token
+    request = urllib.request.Request(
+        f"{training_url}/api/v1/benchmark/sessions",
+        data=json.dumps({
+            "namespace": os.getenv("WCP_NAMESPACE", "default"),
+            "app": os.getenv("WCP_APP", "dvwa"),
+            "ttl_seconds": int(os.getenv("WCP_BENCHMARK_SESSION_TTL", "14400")),
+        }).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=30.0) as response:
+        result = json.loads(response.read().decode("utf-8"))
+    session = result.get("session") if isinstance(result, dict) else None
+    if not isinstance(session, dict) or not session.get("session_id"):
+        raise RuntimeError("training server did not prepare a benchmark session")
+    identity = session.get("identity") if isinstance(session.get("identity"), dict) else {}
+    if not identity.get("model_version"):
+        raise RuntimeError("benchmark session has no active model identity")
+    log.info(
+        "Prepared server-owned benchmark session: id=%s primary=%s shadow=%s",
+        str(session["session_id"])[:12],
+        identity.get("model_version", ""),
+        session.get("candidate_version", ""),
+    )
+    return session
+
+
 def _json_digest(value: Any) -> str:
     encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
 
 def capture_runtime_identity() -> dict[str, Any]:
-    training_url = os.getenv("TRAINING_SERVER_URL", "http://waf-training:8081").rstrip("/")
     agent_url = os.getenv("AI_AGENT_URL", "http://waf-ai-agent:8080").rstrip("/")
-    training = _json_get(f"{training_url}/health")
     agent = _json_get(f"{agent_url}/health")
     runtime = agent.get("runtime_bundle") if isinstance(agent.get("runtime_bundle"), dict) else {}
+    active_versions = runtime.get("active_versions") if isinstance(runtime.get("active_versions"), dict) else {}
     runtime_policy = {
         "runtime_calibration": agent.get("runtime_calibration") or {},
         "waap_policy": agent.get("waap_policy") or {},
     }
     return {
-        "model_version": str(training.get("model_version") or agent.get("model_version") or ""),
+        "model_version": str(active_versions.get("primary") or agent.get("model_version") or ""),
         "active_bundle_id": str(runtime.get("active_bundle_id") or ""),
         "runtime_content_id": str(runtime.get("active_content_id") or runtime.get("active_bundle_id") or ""),
-        "semantic_model_version": str(training.get("semantic_model_version") or ""),
+        "semantic_model_version": str(active_versions.get("semantic") or ""),
         "runtime_policy_sha256": _json_digest(runtime_policy),
         "namespace": str(agent.get("namespace") or os.getenv("WCP_NAMESPACE", "default")),
         "app": str(agent.get("app_scope") or os.getenv("WCP_APP", "dvwa")),
@@ -119,11 +152,13 @@ def build_evaluation_payload(
         "runtime_content_id": identity.get("runtime_content_id", ""),
         "semantic_model_version": identity.get("semantic_model_version", ""),
         "runtime_policy_sha256": identity.get("runtime_policy_sha256", ""),
+        "benchmark_session_id": identity.get("benchmark_session_id", ""),
     }
     source_id = hashlib.sha256(
         json.dumps(source_identity, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
     return {
+        "benchmark_session_id": identity.get("benchmark_session_id") or "",
         "model_version": identity["model_version"],
         "namespace": identity.get("namespace") or "global",
         "app": identity.get("app") or "",
@@ -136,6 +171,8 @@ def build_evaluation_payload(
         "attack_types": attacks,
         "latency": latency,
         "metadata": {
+            "benchmark_session_id": identity.get("benchmark_session_id") or "",
+            "candidate_version": identity.get("candidate_version") or "",
             "waf_name": waf_name,
             "database_sha256": db_sha256,
             "active_bundle_id": identity.get("active_bundle_id") or "",
@@ -196,7 +233,8 @@ def publish_benchmark(start_identity: dict[str, Any]) -> bool:
     try:
         end_identity = capture_runtime_identity()
         if not runtime_identity_matches(start_identity, end_identity):
-            log.warning("Runtime model/bundle changed during execution, but bypassing check to publish anyway.")
+            log.error("Runtime model/content changed during execution; refusing to publish mixed benchmark evidence")
+            return False
         waf_name = os.getenv("WCP_WAF_NAME", "Whackers NginxWAF")
         payload = read_wcp_evaluation(start_identity, waf_name)
         training_url = os.getenv("TRAINING_SERVER_URL", "http://waf-training:8081").rstrip("/")

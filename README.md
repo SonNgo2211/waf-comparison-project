@@ -352,6 +352,17 @@ To customize the PDF report:
 
 </details>
 
+## Optional Training-Server Evidence Publication
+
+This fork can publish the completed DuckDB TP/FP/TN/FN result as independent
+quality evidence when `WCP_PUBLISH_BENCHMARK=true`. WCP first requests an
+app-scoped session from `POST /api/v1/benchmark/sessions`, verifies the agent's
+runtime identity before and after the run, then submits the session-bound report.
+
+WCP does not select, sync, activate, promote, or roll back models and must not
+receive `RUNTIME_BUNDLE_ADMIN_TOKEN`. Those operations belong to the training
+server. `AI_AGENT_URL` is used only for read-only health identity capture.
+
 ## License
 
 ---

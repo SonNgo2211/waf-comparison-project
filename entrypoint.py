@@ -214,10 +214,18 @@ def main() -> None:
     runtime_identity = None
     if publish_enabled:
         try:
+            from benchmark_publisher import prepare_benchmark_session, runtime_identity_matches
+            session = prepare_benchmark_session()
             runtime_identity = capture_runtime_identity()
+            expected_identity = session.get("identity") if isinstance(session.get("identity"), dict) else {}
+            if not runtime_identity_matches(expected_identity, runtime_identity):
+                raise RuntimeError("agent runtime does not match the server-authorized benchmark session")
+            runtime_identity["benchmark_session_id"] = str(session.get("session_id") or "")
+            runtime_identity["candidate_version"] = str(session.get("candidate_version") or "")
             log.info(
-                "Captured benchmark runtime identity: model=%s bundle=%s",
+                "Captured benchmark runtime identity: model=%s candidate=%s bundle=%s",
                 runtime_identity.get("model_version"),
+                runtime_identity.get("candidate_version"),
                 runtime_identity.get("active_bundle_id"),
             )
         except Exception:
