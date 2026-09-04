@@ -1,3 +1,5 @@
+import os
+import random
 import sys
 import urllib.parse
 import zipfile
@@ -115,6 +117,13 @@ def prepare_data() -> None:
         log.info("Legitimate Data Set Preparation Completed.")
 
 
+_ROTATE_IPS = os.getenv("BENCHMARK_ROTATE_IPS", "true").lower() in ("true", "1", "yes")
+
+def _generate_random_ip() -> str:
+    first = random.choice([x for x in range(11, 223) if x not in (127, 169, 172, 192)])
+    return f"{first}.{random.randint(1, 254)}.{random.randint(1, 254)}.{random.randint(1, 254)}"
+
+
 def send_request(_method: str, _url: str, _headers: Optional[Dict[str, str]] = None, _data: Any = None,
                  _timeout: float = 2.0) -> List[Any]:
     """
@@ -129,14 +138,22 @@ def send_request(_method: str, _url: str, _headers: Optional[Dict[str, str]] = N
     Returns:
         List[Any]: [status_code, blocked (bool)].
     """
-    if _headers:
-        for key in list(_headers.keys()):
-            if key.lower() == "host":
-                _headers.pop(key)
+    req_headers = dict(_headers) if _headers else {}
+    for key in list(req_headers.keys()):
+        if key.lower() == "host":
+            req_headers.pop(key)
+
+    if _ROTATE_IPS:
+        header_keys_lower = [k.lower() for k in req_headers.keys()]
+        if "x-forwarded-for" not in header_keys_lower and "x-real-ip" not in header_keys_lower:
+            sim_ip = _generate_random_ip()
+            req_headers["X-Forwarded-For"] = sim_ip
+            req_headers["X-Real-IP"] = sim_ip
+
     attempts = 0
     while attempts < 3:
         try:
-            res = requests.request(_method, url=_url, headers=_headers, data=_data, timeout=_timeout)
+            res = requests.request(_method, url=_url, headers=req_headers, data=_data, timeout=_timeout)
             return [
                 res.status_code,
                 "The requested URL was rejected. Please consult with your administrator." in res.text
