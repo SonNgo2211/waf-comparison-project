@@ -119,9 +119,17 @@ def prepare_data() -> None:
 
 _ROTATE_IPS = os.getenv("BENCHMARK_ROTATE_IPS", "true").lower() in ("true", "1", "yes")
 
+# Own generator: the sampler calls random.seed(FAST_MODE_SEED) before every file,
+# so drawing IPs from the module-level `random` replays the same IP sequence file
+# after file -- 12 366 distinct identities for ~163 000 requests in the 2026-09-21
+# run, i.e. an IP that just sent a malicious payload comes back on a legitimate
+# request a few files later with its reputation attached.
+_ip_rng = random.SystemRandom()
+
+
 def _generate_random_ip() -> str:
-    first = random.choice([x for x in range(11, 223) if x not in (127, 169, 172, 192)])
-    return f"{first}.{random.randint(1, 254)}.{random.randint(1, 254)}.{random.randint(1, 254)}"
+    first = _ip_rng.choice([x for x in range(11, 223) if x not in (127, 169, 172, 192)])
+    return f"{first}.{_ip_rng.randint(1, 254)}.{_ip_rng.randint(1, 254)}.{_ip_rng.randint(1, 254)}"
 
 
 def send_request(_method: str, _url: str, _headers: Optional[Dict[str, str]] = None, _data: Any = None,
@@ -141,6 +149,15 @@ def send_request(_method: str, _url: str, _headers: Optional[Dict[str, str]] = N
     req_headers = dict(_headers) if _headers else {}
     for key in list(req_headers.keys()):
         if key.lower() == "host":
+            req_headers.pop(key)
+        # Framing headers describe the ORIGINAL capture, not the body we send.
+        # `requests` only recomputes Content-Length when there is a body; with an
+        # empty body it forwards the dataset's value verbatim, the WAF waits for
+        # bytes that never come, and the request dies at our 2 s timeout (x3
+        # retries, status 0): 27 934 Legitimate entries carry Content-Length > 0
+        # with an empty body (measured 2026-09-21), turning a 45 min fast run
+        # into 3.5 h and leaving those requests unmeasured.
+        elif key.lower() in ("content-length", "transfer-encoding"):
             req_headers.pop(key)
 
     if _ROTATE_IPS:
