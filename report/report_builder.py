@@ -17,6 +17,7 @@ from report.data_loader import get_blocked_attack_coverage_data, \
     get_false_negative_data_samples, \
     get_true_negative_data_samples, get_false_positive_data_samples, get_malicious_counts, \
     get_legitimate_counts
+from report.resources import load_resource_context
 
 
 def _add_is_pre_tested_wafs_data(_df: pd.DataFrame) -> pd.DataFrame:
@@ -344,5 +345,7 @@ def get_wafs_data_context(data_df: pd.DataFrame) -> Dict[str, List[Dict[str, Any
             wafs_data.append(single_waf_data)
     return {
         "wafs_data": wafs_data,
-        "images": _get_template_images()
+        "images": _get_template_images(),
+        # What the run cost, from DVWA/bench_monitor.py's report.json (None -> no page).
+        "resources": load_resource_context(),
     }

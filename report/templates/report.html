@@ -704,5 +704,133 @@
       </div>
     </div>
     {% endfor %}
+    {% if resources %}
+    <!-- Resource usage (DVWA/bench_monitor.py report.json) -->
+    <div class="page">
+      <div class="header-bar">
+        <div class="header-left">
+          <h1>WAF Comparison Report</h1>
+        </div>
+        <div class="header-right">{{ images.check_point_logo|safe }}</div>
+      </div>
+      <div class="title">Resource usage</div>
+      <div class="page-content">
+        <div class="card box">
+          <p class="card-title">Resource usage during this run</p>
+          <div class="card-title-border description-divider"></div>
+          <span class="description-text"
+            >Run <strong>{{ resources.label }}</strong>, {{ resources.window }}; model {{ resources.model }};
+            {{ resources.images }}. Collected on the host by bench_monitor.py (cgroup, /proc, the agent's
+            metrics and NGINX's decision log) while this benchmark ran.</span
+          >
+        </div>
+        <div class="card box table-card">
+          <span class="card-title">Key figures</span>
+          <div class="card-title-border"></div>
+          <div class="table-scroll">
+            <table class="data-table resource-table">
+              <tbody>
+                {% for pair in resources.kpis|batch(2) %}
+                <tr>{% for k, v in pair %}<td class="kpi-name">{{ k }}</td><td class="kpi-value">{{ v }}</td>{% endfor %}</tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card box table-card">
+          <span class="card-title">CPU and memory per container</span>
+          <div class="card-title-border"></div>
+          <div class="table-scroll">
+            <table class="data-table resource-table">
+              <thead><tr><th>Container</th><th>CPU s</th><th>Cores mean</th><th>Cores p95</th><th>Cores max</th><th>CPU limit</th><th>RSS max MB</th><th>Mem limit MB</th></tr></thead>
+              <tbody>
+                {% for row in resources.containers %}
+                <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bar">
+      <div class="footer-left">
+        <span class="page-number">Page {{ wafs_data|length * 4 + 1 }}</span>
+      </div>
+      <div class="footer-right">
+        <span class="copyright-text"
+          >© Check Point Software Technologies Ltd. All rights reserved.</span
+        >
+      </div>
+    </div>
+    <div class="page">
+      <div class="header-bar">
+        <div class="header-left">
+          <h1>WAF Comparison Report</h1>
+        </div>
+        <div class="header-right">{{ images.check_point_logo|safe }}</div>
+      </div>
+      <div class="title">Resource usage (latency and agent)</div>
+      <div class="page-content">
+        <div class="card box table-card">
+          <span class="card-title">Latency (ms)</span>
+          <div class="card-title-border"></div>
+          <div class="table-scroll">
+            <table class="data-table resource-table">
+              <thead><tr><th>Series</th><th>n</th><th>p50</th><th>p95</th><th>p99</th><th>max</th></tr></thead>
+              <tbody>
+                {% for row in resources.latency %}
+                <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="description-note"><strong>Note:</strong> client latency covers every request; the WAF-added
+            and agent series come from NGINX's decision log, which records actionable requests only. Rotating
+            client IPs make every request a first-seen IP (reverse-DNS path).</p>
+        </div>
+        <div class="card box table-card">
+          <span class="card-title">Where the agent spends its time (per stage)</span>
+          <div class="card-title-border"></div>
+          <div class="table-scroll">
+            <table class="data-table resource-table">
+              <thead><tr><th>Stage</th><th>Count</th><th>Mean ms</th><th>p50</th><th>p95</th><th>p99</th></tr></thead>
+              <tbody>
+                {% for row in resources.stages %}
+                <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="description-note"><strong>Note:</strong> {{ resources.stages_note }}</p>
+        </div>
+        <div class="card box table-card">
+          <span class="card-title">Agent workers</span>
+          <div class="card-title-border"></div>
+          <div class="table-scroll">
+            <table class="data-table resource-table">
+              <thead><tr><th>Worker pid</th><th>CPU s</th><th>Cores mean</th><th>RSS start MB</th><th>RSS max MB</th><th>RSS growth MB</th></tr></thead>
+              <tbody>
+                {% for row in resources.workers %}
+                <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="description-note"><strong>Source:</strong> {{ resources.source }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bar">
+      <div class="footer-left">
+        <span class="page-number">Page {{ wafs_data|length * 4 + 2 }}</span>
+      </div>
+      <div class="footer-right">
+        <span class="copyright-text"
+          >© Check Point Software Technologies Ltd. All rights reserved.</span
+        >
+      </div>
+    </div>
+    {% endif %}
   </body>
 </html>

@@ -880,3 +880,21 @@ body {
         padding-bottom: 12px;
     }
 }
+
+/* Resource usage pages (report/resources.py) */
+.resource-table tbody td {
+    padding: 5px 8px;
+}
+
+.resource-table thead th {
+    padding: 6px 8px;
+}
+
+.resource-table td.kpi-name {
+    font-family: inherit;
+    color: var(--text-color-1);
+}
+
+.resource-table td.kpi-value {
+    font-weight: 700;
+}
