@@ -65,8 +65,28 @@ def _client_latency_from_db() -> Dict[str, Dict[str, Any]]:
             for ds, blk, n, p50, p95, p99, mx in rows}
 
 
+def _timeouts_from_db() -> Optional[int]:
+    """Requests with no answer within 2 s x 3 tries (status 0): the slowest of
+    the run, and absent from every percentile (item 109)."""
+    try:
+        from sqlalchemy import text
+        from config import conn, DB_TABLE_NAME
+        with conn.connect() as c:
+            return int(c.execute(text(f'SELECT count(*) FROM "{DB_TABLE_NAME}" WHERE response_status_code = 0')).scalar() or 0)
+    except Exception:
+        return None
+
+
 def _latency_rows(rep: Dict[str, Any]) -> List[List[str]]:
     rows = []
+    # Item 109: nginx's own request_time for EVERY request (access log), over
+    # the load window when the monitor found one -- the server-side number,
+    # not the client's, and not only the blocked requests.
+    server = ((rep.get("load_window") or {}).get("server_latency") or rep.get("server_latency") or {})
+    for key, label in (("all", "server, every request"), ("waf_added", "server, WAF-added (request - upstream)")):
+        d = server.get(key) or {}
+        if d.get("n"):
+            rows.append([label, str(d.get("n")), _f(d.get("p50")), _f(d.get("p95")), _f(d.get("p99")), _f(d.get("max"))])
     latency = _client_latency_from_db() or (rep.get("wcp") or {}).get("latency") or {}
     for key in ("Legitimate/passed", "Legitimate/blocked", "Malicious/blocked", "Malicious/passed"):
         d = latency.get(key)
@@ -96,20 +116,42 @@ def load_resource_context() -> Optional[Dict[str, Any]]:
     cpu = rep.get("cpu") or {}
     req = rep.get("requests") or {}
     fail_open = sum((req.get("fail_open") or {}).values())
+    window = rep.get("load_window") or {}
+    node = window.get("node") or rep.get("node") or {}
+    timeouts = _timeouts_from_db()
+    if timeouts is None:
+        timeouts = (rep.get("wcp") or {}).get("unmeasured_status0")
+    wl = (window.get("server_latency") or {}).get("all") or {}
     kpis = [
-        ("Agent CPU / scored request", _f(cpu.get("agent_cpu_ms_per_agent_request"), "{:.2f}", " ms")),
-        ("NGINX CPU / request", _f(cpu.get("nginx_cpu_ms_per_request"), "{:.2f}", " ms")),
+        ("Load window", f"{_f(window.get('duration_s'), '{:.0f}', ' s')}, {_f(window.get('rps_mean'), '{:.0f}')} req/s "
+                        f"(peak {_f(window.get('rps_peak'), '{:.0f}')})"),
+        ("Server latency p95 / p99", f"{_f(wl.get('p95'), '{:.0f}')} / {_f(wl.get('p99'), '{:.0f}')} ms, every request"),
+        ("Node CPU busy mean / p95", f"{_f((node.get('busy_pct') or {}).get('mean'), '{:.0f}')} / "
+                                     f"{_f((node.get('busy_pct') or {}).get('p95'), '{:.0f}')} % of {node.get('cpus') or '-'} CPUs"),
+        ("Node CPU pressure (PSI some)", _f((node.get("psi_cpu_some_pct") or {}).get("mean"), "{:.1f}", " %")),
+        ("Agent CPU throttled", _f(window.get("agent_throttled_ms_total"), "{:.0f}", " ms")),
+        ("WCP timeouts (> 2 s, not in percentiles)", "-" if timeouts is None else str(timeouts)),
+        ("Agent net CPU / scored request", _f(cpu.get("agent_net_cpu_ms_per_agent_request", cpu.get("agent_cpu_ms_per_agent_request")), "{:.2f}", " ms")
+                                           + ("" if cpu.get("agent_requests_est") else " (not computable: workers restarted)")),
+        ("NGINX net CPU / request", _f(cpu.get("nginx_net_cpu_ms_per_request", cpu.get("nginx_cpu_ms_per_request")), "{:.2f}", " ms")),
         ("Agent cores p95 / limit", f"{_f(agent.get('cores_p95'), '{:.2f}')} / {_f(agent.get('cpu_limit'), '{:.0f}')}"),
         ("Agent RSS max / limit", f"{_f(agent.get('rss_mb_max'), '{:.0f}')} / {_f(agent.get('mem_limit_mb'), '{:.0f}')} MB"),
         ("NGINX cores p95", _f(nginx.get("cores_p95"), "{:.2f}")),
         ("NGINX RSS max", _f(nginx.get("rss_mb_max"), "{:.0f}", " MB")),
-        ("Fail-open", f"{fail_open} ({_f((req.get('fail_open_rate') or 0) * 100, '{:.2f}')} %)"),
+        ("Fail-open (no verdict, allowed)", f"{fail_open} = {_f((req.get('fail_open_rate') or 0) * 100, '{:.2f}')} % of all requests, "
+                                            f"{_f((req.get('fail_open_share_of_verdict_path') or 0) * 100, '{:.1f}')} % of those needing a verdict"),
+        ("Fail-open inside agent stall windows", f"{req.get('fail_open_in_stalls', '-')} in {len(req.get('stall_windows') or [])} window(s); "
+                                                 f"{req.get('fail_open_outside_stalls', '-')} outside"),
+        ("Agent-path latency p95, outside stalls", _f((((rep.get('latency_outside_stalls_ms') or {}).get('ai_path')) or {}).get('p95'), "{:.0f}", " ms")),
+        ("FP among SCORED legit (WCP)", _f(((rep.get("wcp") or {}).get("fp_rate_scored") or 0) * 100 if (rep.get("wcp") or {}).get("fp_rate_scored") is not None else None, "{:.3f}", " %")),
+        ("Malicious let through unscored (WCP)", str((rep.get("wcp") or {}).get("malicious_unscored_passed", "-"))),
+        ("No verdict, fast-rule fallback enforced", str(sum((req.get("ai_down_fallback") or {}).values()))),
         ("Agent event-loop lag p95", _f((rep.get("agent_loop_lag_ms") or {}).get("p95"), "{:.1f}", " ms")),
     ]
     container_rows = [
         [name + (" (restarted)" if c.get("RESTARTED") else ""), _f(c.get("cpu_s")), _f(c.get("cores_mean"), "{:.2f}"),
          _f(c.get("cores_p95"), "{:.2f}"), _f(c.get("cores_max"), "{:.2f}"), _f(c.get("cpu_limit"), "{:.0f}"),
-         _f(c.get("rss_mb_max"), "{:.0f}"), _f(c.get("mem_limit_mb"), "{:.0f}")]
+         _f(c.get("throttled_s"), "{:.2f}"), _f(c.get("rss_mb_max"), "{:.0f}"), _f(c.get("mem_limit_mb"), "{:.0f}")]
         for name, c in sorted(containers.items(), key=lambda kv: -(kv[1].get("cpu_s") or 0))
     ]
     worker_rows = [

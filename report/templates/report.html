@@ -720,8 +720,8 @@
           <div class="card-title-border description-divider"></div>
           <span class="description-text"
             >Run <strong>{{ resources.label }}</strong>, {{ resources.window }}; model {{ resources.model }};
-            {{ resources.images }}. Collected on the host by bench_monitor.py (cgroup, /proc, the agent's
-            metrics and NGINX's decision log) while this benchmark ran.</span
+            {{ resources.images }}. Collected on the host by bench_monitor.py (cgroup incl. CPU throttling, the node's /proc and PSI,
+            the agent's metrics, NGINX's access and decision logs) while this benchmark ran.</span
           >
         </div>
         <div class="card box table-card">
@@ -742,7 +742,7 @@
           <div class="card-title-border"></div>
           <div class="table-scroll">
             <table class="data-table resource-table">
-              <thead><tr><th>Container</th><th>CPU s</th><th>Cores mean</th><th>Cores p95</th><th>Cores max</th><th>CPU limit</th><th>RSS max MB</th><th>Mem limit MB</th></tr></thead>
+              <thead><tr><th>Container</th><th>CPU s</th><th>Cores mean</th><th>Cores p95</th><th>Cores max</th><th>CPU limit</th><th>Throttled s</th><th>RSS max MB</th><th>Mem limit MB</th></tr></thead>
               <tbody>
                 {% for row in resources.containers %}
                 <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
