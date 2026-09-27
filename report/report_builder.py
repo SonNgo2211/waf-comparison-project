@@ -17,7 +17,7 @@ from report.data_loader import get_blocked_attack_coverage_data, \
     get_false_negative_data_samples, \
     get_true_negative_data_samples, get_false_positive_data_samples, get_malicious_counts, \
     get_legitimate_counts
-from report.resources import load_resource_context
+from report.resources import load_resource_comparison, load_resource_context
 
 
 def _add_is_pre_tested_wafs_data(_df: pd.DataFrame) -> pd.DataFrame:
@@ -343,9 +343,13 @@ def get_wafs_data_context(data_df: pd.DataFrame) -> Dict[str, List[Dict[str, Any
         if not is_pre_tested_waf_row(waf_data):
             single_waf_data = _build_single_waf_data(waf_data, data_df, legitimate_counts, malicious_counts)
             wafs_data.append(single_waf_data)
+    compare = load_resource_comparison()
     return {
         "wafs_data": wafs_data,
         "images": _get_template_images(),
         # What the run cost, from DVWA/bench_monitor.py's report.json (None -> no page).
-        "resources": load_resource_context(),
+        # Item 123: several runs in one DB -> one side-by-side page instead; the single-run
+        # pages read the DB and would mix the arms.
+        "resources_compare": compare,
+        "resources": None if compare else load_resource_context(),
     }

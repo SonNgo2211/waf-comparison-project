@@ -898,3 +898,22 @@ body {
 .resource-table td.kpi-value {
     font-weight: 700;
 }
+
+.summary-list {
+    margin: 8px 0 0 18px;
+    padding: 0;
+    color: var(--text-color-1);
+    font-size: 11px;
+    line-height: 1.5;
+}
+.summary-list li { margin-bottom: 4px; }
+
+/* item 123: side-by-side page, up to three arms on one page */
+.compare-table tbody td {
+    padding: 3px 6px;
+    font-size: 9px;
+}
+
+.compare-table thead th {
+    padding: 4px 6px;
+}

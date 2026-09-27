@@ -704,7 +704,110 @@
       </div>
     </div>
     {% endfor %}
+    {% if resources_compare %}
+    <!-- Resource usage comparison (item 123): the benchmark arms side by side -->
+    <div class="page">
+      <div class="header-bar">
+        <div class="header-left">
+          <h1>WAF Comparison Report</h1>
+        </div>
+        <div class="header-right">{{ images.check_point_logo|safe }}</div>
+      </div>
+      <div class="title">Latency and resource usage &mdash; side by side</div>
+      <div class="page-content">
+        <div class="card box table-card">
+          <span class="card-title">What each configuration cost on the same benchmark</span>
+          <div class="card-title-border"></div>
+          <div class="table-scroll">
+            <table class="data-table resource-table compare-table">
+              <thead><tr><th></th>{% for arm in resources_compare.arms %}<th>{{ arm }}</th>{% endfor %}</tr></thead>
+              <tbody>
+                {% for row in resources_compare.rows %}
+                <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="description-note"><strong>How to read:</strong> typical (p50): half of the requests were faster;
+            95 %: all but the slowest 1 in 20 were faster -- what most users notice; "the WAF itself": time spent in the WAF,
+            excluding the application behind it.</p>
+        </div>
+        <div class="card box">
+          <p class="card-title">Keep in mind</p>
+          <div class="card-title-border description-divider"></div>
+          <ul class="summary-list">
+            {% for line in resources_compare.notes %}<li>{{ line }}</li>{% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bar">
+      <div class="footer-left">
+        <span class="page-number">Page {{ wafs_data|length * 4 + 1 }}</span>
+      </div>
+      <div class="footer-right">
+        <span class="copyright-text"
+          >© Check Point Software Technologies Ltd. All rights reserved.</span
+        >
+      </div>
+    </div>
+    {% endif %}
     {% if resources %}
+    <!-- Resource usage summary (item 122): three situations and plain sentences, for a non-technical reader -->
+    <div class="page">
+      <div class="header-bar">
+        <div class="header-left">
+          <h1>WAF Comparison Report</h1>
+        </div>
+        <div class="header-right">{{ images.check_point_logo|safe }}</div>
+      </div>
+      <div class="title">Resource usage &mdash; summary</div>
+      <div class="page-content">
+        <div class="card box">
+          <p class="card-title">In plain terms</p>
+          <div class="card-title-border description-divider"></div>
+          <ul class="summary-list">
+            {% for line in resources.summary.sentences %}<li>{{ line }}</li>{% endfor %}
+          </ul>
+        </div>
+        <div class="card box table-card">
+          <span class="card-title">By situation</span>
+          <div class="card-title-border"></div>
+          <div class="table-scroll">
+            <table class="data-table resource-table">
+              <thead><tr><th>Situation</th><th>Requests / s</th><th>Answered, typical</th><th>Answered, 95 % of requests</th><th>Of which WAF, typical / 95 %</th><th>WAF CPU (cores in use)</th><th>WAF memory</th></tr></thead>
+              <tbody>
+                {% for row in resources.summary.rows %}
+                <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if resources.summary.glossary %}
+          <p class="description-note"><strong>How to read:</strong> {{ resources.summary.glossary|join('; ') }}.</p>
+          {% endif %}
+        </div>
+        {% if resources.summary.caveats %}
+        <div class="card box">
+          <p class="card-title">Keep in mind</p>
+          <div class="card-title-border description-divider"></div>
+          <ul class="summary-list">
+            {% for line in resources.summary.caveats %}<li>{{ line }}</li>{% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="footer-bar">
+      <div class="footer-left">
+        <span class="page-number">Page {{ wafs_data|length * 4 + 1 }}</span>
+      </div>
+      <div class="footer-right">
+        <span class="copyright-text"
+          >© Check Point Software Technologies Ltd. All rights reserved.</span
+        >
+      </div>
+    </div>
     <!-- Resource usage (DVWA/bench_monitor.py report.json) -->
     <div class="page">
       <div class="header-bar">
@@ -719,9 +822,9 @@
           <p class="card-title">Resource usage during this run</p>
           <div class="card-title-border description-divider"></div>
           <span class="description-text"
-            >Run <strong>{{ resources.label }}</strong>, {{ resources.window }}; model {{ resources.model }};
+            >Run <strong>{{ resources.label }}</strong>, {{ resources.window }};{% if resources.agent_used %} model {{ resources.model }};{% endif %}
             {{ resources.images }}. Collected on the host by bench_monitor.py (cgroup incl. CPU throttling, the node's /proc and PSI,
-            the agent's metrics, NGINX's access and decision logs) while this benchmark ran.</span
+            {% if resources.agent_used %}the agent's metrics, {% endif %}NGINX's access and decision logs) while this benchmark ran.</span
           >
         </div>
         <div class="card box table-card">
@@ -750,12 +853,13 @@
               </tbody>
             </table>
           </div>
+          {% if resources.containers_note %}<p class="description-note"><strong>Note:</strong> {{ resources.containers_note }}</p>{% endif %}
         </div>
       </div>
     </div>
     <div class="footer-bar">
       <div class="footer-left">
-        <span class="page-number">Page {{ wafs_data|length * 4 + 1 }}</span>
+        <span class="page-number">Page {{ wafs_data|length * 4 + 2 }}</span>
       </div>
       <div class="footer-right">
         <span class="copyright-text"
@@ -770,7 +874,7 @@
         </div>
         <div class="header-right">{{ images.check_point_logo|safe }}</div>
       </div>
-      <div class="title">Resource usage (latency and agent)</div>
+      <div class="title">Resource usage (latency{% if resources.agent_used %} and agent{% endif %})</div>
       <div class="page-content">
         <div class="card box table-card">
           <span class="card-title">Latency (ms)</span>
@@ -786,9 +890,10 @@
             </table>
           </div>
           <p class="description-note"><strong>Note:</strong> client latency covers every request; the WAF-added
-            and agent series come from NGINX's decision log, which records actionable requests only. Rotating
-            client IPs make every request a first-seen IP (reverse-DNS path).</p>
+            {% if resources.agent_used %}and agent series come{% else %}series comes{% endif %} from NGINX's decision log, which records actionable requests only.{% if resources.rdns_caveat %}
+            Rotating client IPs make every request a first-seen IP (reverse-DNS path).{% endif %}</p>
         </div>
+{% if resources.agent_used %}
         <div class="card box table-card">
           <span class="card-title">Where the agent spends its time (per stage)</span>
           <div class="card-title-border"></div>
@@ -819,11 +924,14 @@
           </div>
           <p class="description-note"><strong>Source:</strong> {{ resources.source }}</p>
         </div>
+        {% else %}
+        <p class="description-note"><strong>Source:</strong> {{ resources.source }}</p>
+        {% endif %}
       </div>
     </div>
     <div class="footer-bar">
       <div class="footer-left">
-        <span class="page-number">Page {{ wafs_data|length * 4 + 2 }}</span>
+        <span class="page-number">Page {{ wafs_data|length * 4 + 3 }}</span>
       </div>
       <div class="footer-right">
         <span class="copyright-text"
